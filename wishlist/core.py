@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals, division, print_function, absolute_import
 import datetime
+import locale
 import re
 import os
 from contextlib import contextmanager
+from collections import namedtuple
 import logging
 
 from bs4 import BeautifulSoup, Tag
@@ -22,8 +24,10 @@ logger = logging.getLogger(__name__)
 class BaseAmazon(object):
     @property
     def host(self):
-        return environ.HOST
-        #return os.environ.get("WISHLIST_HOST", "https://www.amazon.com")
+        # https://stackoverflow.com/questions/955986/what-is-the-correct-way-to-set-pythons-locale-on-windows/956084#956084
+        locale.setlocale(locale.LC_ALL, 'deu_deu')
+        return "https://www.amazon.de"  #environ.HOST
+        #return os.environ.get("WISHLIST_HOST", "https://www.amazon.de")
 
     def soupify(self, body):
         # https://www.crummy.com/software/BeautifulSoup/
@@ -112,7 +116,6 @@ class WishlistElement(BaseAmazon):
 
         return href.strip()
 
-
     @property
     def image(self):
         src = ""
@@ -139,12 +142,7 @@ class WishlistElement(BaseAmazon):
         price = 0.0
 
         el = self.soup.find("span", id=re.compile(r"^itemPrice_"))
-        #pout.v(el.prettify())
-        #pout.v(self.soup.prettify())
-#         pout.v(str(self.soup))
-#         import testdata
-#         f = testdata.create_file("output.html", self.soup.prettify())
-#         pout.v(f)
+
         if el and len(el.contents) >= 1:
             # the new HTML actually has separate spans for whole currency
             # units and fractional currency units
@@ -187,9 +185,43 @@ class WishlistElement(BaseAmazon):
         price = 0.0
         el = self.soup.find("span", {"class": "itemUsedAndNewPrice"})
         if el and len(el.contents) > 0:
-            match = re.match(".+(\d+\.\d+)", el.contents[0])
-            price = float(match.group(1)) if match else 0.0
+            # marketplace price decimal separator might be ',' or '.' depending on locale.
+            match = re.match(r".+(\d+\.|\,\d+)", el.contents[0])
+            # replace decimal separator ',' with '.'
+            marketplace_price = match.group().replace(',', '.') if match else 0.0
+            price = float(marketplace_price)
         return price
+
+    @property
+    def item_used_and_new_url(self):
+        href = ""
+        el = self.soup.find(class_=re.compile("^itemUsedAndNewLink"))
+        if el and ("href" in el.attrs):
+            href = self.host + el.attrs["href"]
+        # if no new_and_used offer exists return None
+        return href or None
+
+    @property
+    def item_used_and_new_offers(self):
+        el = self.soup.find(class_=re.compile("^itemUsedAndNewLink"))
+        if el:
+            match = re.match(r"\d+", el.contents[0])
+            offers = match.group()
+        else:
+            offers = None
+
+        return offers
+
+    @property
+    def item_used_and_new_soup(self):
+        url = self.item_used_and_new_url
+        if not url:
+            return None
+        with SimpleBrowser.session() as b:
+            b.load(url)
+            b.dump(self.title.replace(' ', '.'))
+            soup = b.soup
+        return soup
 
     @property
     def title(self):
@@ -236,7 +268,11 @@ class WishlistElement(BaseAmazon):
     @property
     def added(self):
         ret = None
-        format_str = '%B %d, %Y'
+        _locale, _ = locale.getlocale()
+        if _locale == 'de_DE':
+            format_str = '%d. %B %Y'
+        else:
+            format_str = '%B %d, %Y'
         el = self.soup.find('span', id=re.compile('^itemAddedDate_'))
         if el is None or len(el.contents) < 3:
             el = self.soup.select_one(".dateAddedText > span")
@@ -358,23 +394,107 @@ class WishlistElement(BaseAmazon):
     def jsonable(self):
         json_item = {}
         json_item["title"] = self.title
-        json_item["image"] = self.image
-        json_item["uuid"] = self.uuid
-        json_item["url"] = self.url
-        json_item["page_url"] = self.page_url
+        #json_item["image"] = self.image
+        #json_item["uuid"] = self.uuid
+        #json_item["url"] = self.url
+        #json_item["page_url"] = self.page_url
         json_item["price"] = self.price
-        json_item["marketplace_price"] = self.marketplace_price
+        #json_item["marketplace_price"] = self.marketplace_price
+        json_item["item_used_an_new_offers"] = self.item_used_and_new_offers
+        #w = WishlistOffers(self)
+        #w.offers_details
         json_item["comment"] = self.comment
-        json_item["author"] = self.author
+        #json_item["author"] = self.author
         json_item["added"] = self.added.strftime('%B %d, %Y')
         json_item["rating"] = self.rating
-        json_item["quantity"] = {
-            "wanted": self.wanted_count,
-            "has": self.has_count
-        }
+        #json_item["quantity"] = {
+        #    "wanted": self.wanted_count,
+        #    "has": self.has_count
+        #}
         json_item["digital"] = self.is_digital()
         json_item["source"] = self.source
         return json_item
+
+class WishlistOffers(BaseAmazon):
+    """
+    """
+    def __init__(self, wishlist_element):
+
+        self.wishlist_element = wishlist_element
+        print(self.wishlist_element.title)
+
+        self.marketplaces_details = namedtuple('marketplaces_details', [
+            'seller',
+            'price',
+            'shipping',
+            'condition'
+        ])
+
+    @property
+    def offers_details(self):
+
+        res = []
+
+        offers_wishlist_soup = self.wishlist_element.item_used_and_new_soup
+
+        if offers_wishlist_soup:
+            html_doc = str(offers_wishlist_soup).split(r'<hr class="a-spacing-mini a-divider-normal">')
+        else:
+            # in case no new and used item offers exist
+            print('No new_and_used offers for %s available.' % self.wishlist_element.title)
+            res.append(self.marketplaces_details('N/A', '.0', '.0', ''))
+            return res
+
+        for html_part in html_doc:
+
+            soup = BeautifulSoup(html_part, 'html.parser')
+
+            seller_name = soup.find('h3', attrs={'class': 'olpSellerName'})
+            if not seller_name:
+                continue
+            if seller_name.span:
+                seller = seller_name.a.string.strip()
+            else:
+                seller = seller_name.img.attrs['alt']
+            offer_price = soup.find('span', attrs={'class': 'olpOfferPrice'})
+            offer_shipping_info = soup.find_all('p', attrs={'class', 'olpShippingInfo'})
+
+            def get_shipping_costs():
+                for shipping_info in offer_shipping_info:
+                    for element in shipping_info.span.children:
+                        if isinstance(element, Tag):
+                            match = re.search(r"\d+(\,|\.)\d+", element.next_element.string.strip())
+                            if match:
+                                return match.group()
+                            else:
+                                return '.0'
+                        elif u'KOSTENLOSE LIEFERUNG' in element.string.strip().upper():  # TODO: fix locale dependency
+                            return '.0'
+
+            offer_condition = soup.find('span', attrs={'class': 'olpCondition'})
+            shipping_cost = get_shipping_costs()
+
+            res.append(self.marketplaces_details(seller,
+                                                 offer_price.string.strip(),
+                                                 shipping_cost,
+                                                 re.sub(r'\s+\-', ' -', offer_condition.string.strip())
+                                                 ))
+
+        return res
+
+    def lowest_offer(self):
+        """
+
+        :return:
+        """
+        pass
+
+    def lowest_offer_incl_shipping(self):
+        """
+
+        :return:
+        """
+        pass
 
 
 class Wishlist(BaseAmazon):
@@ -423,7 +543,8 @@ class Wishlist(BaseAmazon):
             page = 1
             while url:
                 b.load(url)
-                b.dump(basename="{}-{}".format(name, page))
+                # b.dump(directory="{}-{}".format(name, page))
+                b.dump()
                 soup = b.soup
 
                 for item in self.get_items(soup, url, page):
