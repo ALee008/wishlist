@@ -3,7 +3,6 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import datetime
 import locale
 import re
-import os
 from contextlib import contextmanager
 from collections import namedtuple
 import logging
@@ -89,11 +88,6 @@ class WishlistElement(BaseAmazon):
         el = self.soup.find("a", id=re.compile("^itemName_"))
         if el and ("href" in el.attrs):
             href = self.host + el.attrs["href"]
-
-#             m = re.search("/dp/([^/]+)", el.attrs["href"])
-#             if m:
-#                 href = "{}/dp/{}/".format(self.host, m.group(1))
-
         return href
 
     @property
@@ -367,6 +361,12 @@ class WishlistElement(BaseAmazon):
         self._page_url = page_url
         self.page = int(page)
 
+    def wishlist_new_and_used_offers(self):
+        new_and_used_offers = WishlistOffers(self)
+
+        return new_and_used_offers.offers_details
+
+
     def is_digital(self):
         """Return true if this is a digital good like a Kindle book or mp3"""
         ret = False
@@ -394,23 +394,11 @@ class WishlistElement(BaseAmazon):
     def jsonable(self):
         json_item = {}
         json_item["title"] = self.title
-        #json_item["image"] = self.image
-        #json_item["uuid"] = self.uuid
-        #json_item["url"] = self.url
-        #json_item["page_url"] = self.page_url
         json_item["price"] = self.price
-        #json_item["marketplace_price"] = self.marketplace_price
         json_item["item_used_an_new_offers"] = self.item_used_and_new_offers
-        #w = WishlistOffers(self)
-        #w.offers_details
         json_item["comment"] = self.comment
-        #json_item["author"] = self.author
         json_item["added"] = self.added.strftime('%B %d, %Y')
         json_item["rating"] = self.rating
-        #json_item["quantity"] = {
-        #    "wanted": self.wanted_count,
-        #    "has": self.has_count
-        #}
         json_item["digital"] = self.is_digital()
         json_item["source"] = self.source
         return json_item
@@ -422,6 +410,8 @@ class WishlistOffers(BaseAmazon):
 
         self.wishlist_element = wishlist_element
         print(self.wishlist_element.title)
+        # init
+        self.new_and_used_details = None
 
         self.marketplaces_details = namedtuple('marketplaces_details', [
             'seller',
@@ -430,57 +420,62 @@ class WishlistOffers(BaseAmazon):
             'condition'
         ])
 
-    @property
-    def offers_details(self):
 
-        res = []
+    def new_and_used_offers_details(self):
 
-        offers_wishlist_soup = self.wishlist_element.item_used_and_new_soup
+        if self.new_and_used_details is None:
+            res = []
 
-        if offers_wishlist_soup:
-            html_doc = str(offers_wishlist_soup).split(r'<hr class="a-spacing-mini a-divider-normal">')
-        else:
-            # in case no new and used item offers exist
-            print('No new_and_used offers for %s available.' % self.wishlist_element.title)
-            res.append(self.marketplaces_details('N/A', '.0', '.0', ''))
-            return res
+            offers_wishlist_soup = self.wishlist_element.item_used_and_new_soup
 
-        for html_part in html_doc:
-
-            soup = BeautifulSoup(html_part, 'html.parser')
-
-            seller_name = soup.find('h3', attrs={'class': 'olpSellerName'})
-            if not seller_name:
-                continue
-            if seller_name.span:
-                seller = seller_name.a.string.strip()
+            if offers_wishlist_soup:
+                html_doc = str(offers_wishlist_soup).split(r'<hr class="a-spacing-mini a-divider-normal">')
             else:
-                seller = seller_name.img.attrs['alt']
-            offer_price = soup.find('span', attrs={'class': 'olpOfferPrice'})
-            offer_shipping_info = soup.find_all('p', attrs={'class', 'olpShippingInfo'})
+                # in case no new and used item offers exist
+                print('No new_and_used offers for %s available.' % self.wishlist_element.title)
+                res.append(self.marketplaces_details('N/A', '.0', '.0', ''))
+                return res
 
-            def get_shipping_costs():
-                for shipping_info in offer_shipping_info:
-                    for element in shipping_info.span.children:
-                        if isinstance(element, Tag):
-                            match = re.search(r"\d+(\,|\.)\d+", element.next_element.string.strip())
-                            if match:
-                                return match.group()
-                            else:
+            for html_part in html_doc:
+
+                soup = BeautifulSoup(html_part, 'html.parser')
+
+                seller_name = soup.find('h3', attrs={'class': 'olpSellerName'})
+                if not seller_name:
+                    continue
+                if seller_name.span:
+                    seller = seller_name.a.string.strip()
+                else:
+                    seller = seller_name.img.attrs['alt']
+                offer_price = soup.find('span', attrs={'class': 'olpOfferPrice'})
+                offer_shipping_info = soup.find_all('p', attrs={'class', 'olpShippingInfo'})
+
+                def get_shipping_costs():
+                    for shipping_info in offer_shipping_info:
+                        for element in shipping_info.span.children:
+                            if isinstance(element, Tag):
+                                match = re.search(r"\d+(\,|\.)\d+", element.next_element.string.strip())
+                                if match:
+                                    return match.group()
+                                else:
+                                    return '.0'
+                            elif u'KOSTENLOSE LIEFERUNG' in element.string.strip().upper():  # TODO: fix locale dependency
                                 return '.0'
-                        elif u'KOSTENLOSE LIEFERUNG' in element.string.strip().upper():  # TODO: fix locale dependency
-                            return '.0'
 
-            offer_condition = soup.find('span', attrs={'class': 'olpCondition'})
-            shipping_cost = get_shipping_costs()
+                offer_condition = soup.find('span', attrs={'class': 'olpCondition'})
+                shipping_cost = get_shipping_costs()
 
-            res.append(self.marketplaces_details(seller,
-                                                 offer_price.string.strip(),
-                                                 shipping_cost,
-                                                 re.sub(r'\s+\-', ' -', offer_condition.string.strip())
-                                                 ))
+                res.append(self.marketplaces_details(seller,
+                                                     offer_price.string.strip(),
+                                                     shipping_cost,
+                                                     re.sub(r'\s+\-', ' -', offer_condition.string.strip())
+                                                     ))
 
-        return res
+            self.new_and_used_details = res
+
+            return res
+        else:
+            return self.new_and_used_details
 
     def lowest_offer(self):
         """
