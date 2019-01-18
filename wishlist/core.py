@@ -406,7 +406,7 @@ class WishlistOffers(BaseAmazon):
     def __init__(self, wishlist_element):
 
         self.wishlist_element = wishlist_element
-        print(self.wishlist_element.title)
+        #print(self.wishlist_element.title)
 
         self.marketplaces_details = namedtuple('marketplaces_details', [
             'seller',
@@ -453,18 +453,21 @@ class WishlistOffers(BaseAmazon):
             offer_shipping_info = soup.find_all('p', attrs={'class', 'olpShippingInfo'})
 
             def get_shipping_costs():
+                # if olpShippingInfo is empty/None in most cases due to 'prime' and thus free delivery.
+                if not offer_shipping_info:
+                    return '0,0'
                 for shipping_info in offer_shipping_info:
                     for element in shipping_info.span.children:
                         if isinstance(element, Tag):
                             shipping_cost_from_string = self.get_price_from_string(element.next_element.string.strip())
                             # TODO: fix locale dependency
-                            return shipping_cost_from_string if shipping_cost_from_string is not None else '0,0'
+                            return shipping_cost_from_string or '0,0'  # if None return 0,0
                         # TODO: fix locale dependency
                         elif element.string.strip().upper() in [u'KOSTENLOSE LIEFERUNG', u'KOSTENFREIE LIEFERUNG']:
-                            return '0.0'  # TODO: fix locale dependency
+                            return '0,0'  # TODO: fix locale dependency
 
             offer_condition = soup.find('span', attrs={'class': 'olpCondition'})
-            shipping_cost = get_shipping_costs()
+            shipping_cost = get_shipping_costs() or '0,0'
 
             res.append(self.marketplaces_details(seller,
                                                  # because of localization 24,99 to 24.99
