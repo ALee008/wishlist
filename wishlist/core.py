@@ -3,6 +3,7 @@ from __future__ import unicode_literals, division, print_function, absolute_impo
 import datetime
 import locale
 import re
+import os
 import copy
 from contextlib import contextmanager
 from collections import namedtuple
@@ -19,14 +20,24 @@ from . import environ
 
 
 logger = logging.getLogger(__name__)
-locale.setlocale(locale.LC_ALL, 'deu_deu')
+
 
 class BaseAmazon(object):
+
     @property
     def host(self):
         # https://stackoverflow.com/questions/955986/what-is-the-correct-way-to-set-pythons-locale-on-windows/956084#956084
-        return "https://www.amazon.de"  #environ.HOST
-        #return os.environ.get("WISHLIST_HOST", "https://www.amazon.de")
+        host = os.environ.get("WISHLIST_HOST", "https://www.amazon.de")
+
+        return host
+
+    def set_locale(self):
+        """Setting locale for correct date formatting."""
+        if self.host.endswith('.de'):
+            if os.name == 'nt':
+                locale.setlocale(locale.LC_ALL, 'deu_deu')
+            else:
+                locale.setlocale(locale.LC_ALL, 'de_De')
 
     def soupify(self, body):
         # https://www.crummy.com/software/BeautifulSoup/
@@ -417,7 +428,7 @@ class WishlistOffers(BaseAmazon):
 
     @staticmethod
     def get_price_from_string(price_as_string):
-        match = re.search(r"\d+(\,|\.)\d+", price_as_string)
+        match = re.search(r"\d+(\,|\.)\d+", price_as_string.strip())
         if match:
             return match.group()
         else:
@@ -434,7 +445,7 @@ class WishlistOffers(BaseAmazon):
             html_doc = str(offers_wishlist_soup).split(r'<hr class="a-spacing-mini a-divider-normal">')
         else:
             # in case no new and used item offers exist
-            print('No new_and_used offers for <<%s>> available.' % self.wishlist_element.title)
+            print('No new_and_used offers for << %s >> available.' % self.wishlist_element.title)
             res.append(self.marketplaces_details('N/A', '0.0', '0.0', ''))
             return res
 
@@ -453,21 +464,16 @@ class WishlistOffers(BaseAmazon):
             offer_shipping_info = soup.find_all('p', attrs={'class', 'olpShippingInfo'})
 
             def get_shipping_costs():
-                # if olpShippingInfo is empty/None in most cases due to 'prime' and thus free delivery.
-                if not offer_shipping_info:
-                    return '0,0'
                 for shipping_info in offer_shipping_info:
-                    for element in shipping_info.span.children:
-                        if isinstance(element, Tag):
-                            shipping_cost_from_string = self.get_price_from_string(element.next_element.string.strip())
-                            # TODO: fix locale dependency
-                            return shipping_cost_from_string or '0,0'  # if None return 0,0
-                        # TODO: fix locale dependency
-                        elif element.string.strip().upper() in [u'KOSTENLOSE LIEFERUNG', u'KOSTENFREIE LIEFERUNG']:
-                            return '0,0'  # TODO: fix locale dependency
+                        target = shipping_info.span.a
+                        if target and target.get('target').strip().upper() == 'SuperSaverShipping'.upper():
+                            return '0.0'  # TODO: fix locale dependency
+                        else:
+                            shipping_cost_from_string = self.get_price_from_string(shipping_info.text)
+                            return shipping_cost_from_string if shipping_cost_from_string is not None else '0.0'
 
             offer_condition = soup.find('span', attrs={'class': 'olpCondition'})
-            shipping_cost = get_shipping_costs() or '0,0'
+            shipping_cost = get_shipping_costs()
 
             res.append(self.marketplaces_details(seller,
                                                  # because of localization 24,99 to 24.99
@@ -483,7 +489,7 @@ class WishlistOffers(BaseAmazon):
         """
         """
         offers_details = copy.deepcopy(self.offers_details)
-
+        # TODO: test for Wer regiert die Welt? (Sonderausgabe)
         lowest_offer = min(offers_details, key=lambda x: x.price)
         lowest_offer_incl_shipping = min(offers_details, key=lambda x: (float(x.price) + float(x.shipping)))
 
@@ -506,6 +512,7 @@ class Wishlist(BaseAmazon):
 
     def __init__(self, name):
         self.name = name
+        self.set_locale()
 
     def robot_check(self, soup):
         el = soup.find("form", action=re.compile(r"validateCaptcha", re.I))
@@ -526,10 +533,8 @@ class Wishlist(BaseAmazon):
             yield item
 
     def __iter__(self):
-        host = self.host
         # so the lists are circular for some reason, so we need to track what pages
         # we have seen and stop when we see the item uuid again
-        name = self.name
         seen_uuids = set()
         url = self.get_wishlist_url()
         with SimpleBrowser.session() as b:
@@ -554,4 +559,3 @@ class Wishlist(BaseAmazon):
                             url = self.get_wishlist_url(elem["value"])
                             seen_uuids.add(uuid)
                             page += 1
-
