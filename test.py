@@ -22,12 +22,15 @@ def clock(func):
 
 @clock
 def test():
-    name = "3ATVLKBO1V2CC"
+    name = "KEY_HERE"
     w = Wishlist(name)
+    res = []
     i = 0
     for item in w:
-        print(item.jsonable())
+        res.append(item.jsonable())
         i += 1
+    print(res)
     print('# items', i)
+
 
 test()
