@@ -1,7 +1,9 @@
+import os
 import time
-import cProfile
+import glob
 import functools
-from wishlist.core import Wishlist
+from bs4 import BeautifulSoup
+from wishlist.core import Wishlist, WishlistOffers
 
 def clock(func):
     @functools.wraps(func)
@@ -22,14 +24,30 @@ def clock(func):
     return clocked
 
 @clock
-def test():
-    name = "3ATVLKBO1V2CC"
+def test(key):
+    name = key
     w = Wishlist(name)
+    res = []
     i = 0
     for item in w:
-        print(item.jsonable())
+        res.append(item.jsonable())
         i += 1
+    print(res)
     print('# items', i)
 
-#cProfile.run('test()')
-test()
+
+def test_offers():
+
+    htmls = glob.glob(os.path.join(r"testdata/de_DE_test", '*.html'))
+
+    for html_doc in htmls:
+
+        with open(html_doc) as html:
+
+            soup = BeautifulSoup(html.read(), 'html.parser')
+            w = WishlistOffers('dummy')
+            print(w.get_offer_details(str(soup).split(r'<hr class="a-spacing-mini a-divider-normal">')))
+
+key = "KEY_HERE"
+
+test(key)

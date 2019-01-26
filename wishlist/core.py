@@ -417,7 +417,7 @@ class WishlistOffers(BaseAmazon):
     def __init__(self, wishlist_element):
 
         self.wishlist_element = wishlist_element
-        print(self.wishlist_element.title)
+        #print(self.wishlist_element.title)
 
         self.marketplaces_details = namedtuple('marketplaces_details', [
             'seller',
@@ -434,20 +434,9 @@ class WishlistOffers(BaseAmazon):
         else:
             return None
 
-    @property
-    def offers_details(self):
+    def get_offer_details(self, html_doc):
 
         res = []
-
-        offers_wishlist_soup = self.wishlist_element.item_used_and_new_soup
-
-        if offers_wishlist_soup:
-            html_doc = str(offers_wishlist_soup).split(r'<hr class="a-spacing-mini a-divider-normal">')
-        else:
-            # in case no new and used item offers exist
-            print('No new_and_used offers for << %s >> available.' % self.wishlist_element.title)
-            res.append(self.marketplaces_details('N/A', '0.0', '0.0', ''))
-            return res
 
         for html_part in html_doc:
 
@@ -467,7 +456,7 @@ class WishlistOffers(BaseAmazon):
                 for shipping_info in offer_shipping_info:
                         target = shipping_info.span.a
                         if target and target.get('target').strip().upper() == 'SuperSaverShipping'.upper():
-                            return '0.0'  # TODO: fix locale dependency
+                            return '0.0'
                         else:
                             shipping_cost_from_string = self.get_price_from_string(shipping_info.text)
                             return shipping_cost_from_string if shipping_cost_from_string is not None else '0.0'
@@ -475,12 +464,41 @@ class WishlistOffers(BaseAmazon):
             offer_condition = soup.find('span', attrs={'class': 'olpCondition'})
             shipping_cost = get_shipping_costs()
 
+            res.append(
+                (
+                    seller,
+                    offer_price.replace(',', '.'),  # because of localization 24,99 to 24.99
+                    shipping_cost.replace(',', '.'),
+                    re.sub(r'\s+\-', ' -', offer_condition.string.strip())
+                )
+            )
+
+        return res
+
+    @property
+    def offers_details(self):
+
+        res = []
+
+        offers_wishlist_soup = self.wishlist_element.item_used_and_new_soup
+
+        if offers_wishlist_soup:
+            html_doc = str(offers_wishlist_soup).split(r'<hr class="a-spacing-mini a-divider-normal">')
+        else:
+            # in case no new and used item offers exist
+            print('No new_and_used offers for << %s >> available.' % self.wishlist_element.title)
+            res.append(self.marketplaces_details('N/A', '0.0', '0.0', ''))
+            return res
+
+        for offers in self.get_offer_details(html_doc):
+            seller, offer_price, shipping_cost, offer_condition = offers
+
             res.append(self.marketplaces_details(seller,
-                                                 # because of localization 24,99 to 24.99
-                                                 offer_price.replace(',', '.'),
-                                                 shipping_cost.replace(',', '.'),
-                                                 re.sub(r'\s+\-', ' -', offer_condition.string.strip())
-                                                 ))
+                                                 offer_price,
+                                                 shipping_cost,
+                                                 offer_condition
+                                                 )
+                       )
 
         return res
 
@@ -489,8 +507,7 @@ class WishlistOffers(BaseAmazon):
         """
         """
         offers_details = copy.deepcopy(self.offers_details)
-        # TODO: test for Wer regiert die Welt? (Sonderausgabe)
-        lowest_offer = min(offers_details, key=lambda x: x.price)
+        lowest_offer = min(offers_details, key=lambda x: float(x.price))
         lowest_offer_incl_shipping = min(offers_details, key=lambda x: (float(x.price) + float(x.shipping)))
 
         return lowest_offer, lowest_offer_incl_shipping
@@ -559,4 +576,3 @@ class Wishlist(BaseAmazon):
                             url = self.get_wishlist_url(elem["value"])
                             seen_uuids.add(uuid)
                             page += 1
-
