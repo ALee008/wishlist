@@ -1,4 +1,5 @@
 import time
+import cProfile
 import functools
 from wishlist.core import Wishlist
 
@@ -30,4 +31,5 @@ def test():
         i += 1
     print('# items', i)
 
+#cProfile.run('test()')
 test()
