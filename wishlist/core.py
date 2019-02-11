@@ -406,10 +406,12 @@ class WishlistElement(BaseAmazon):
         json_item["rating"] = self.rating
         json_item["digital"] = self.is_digital()
         json_item["source"] = self.source
-        new_and_used_offers = WishlistOffers(self)
-        # nauo = new and used offer price
-        json_item["lowest_nauop"], json_item["lowser_nauop_incl_shipping"] = new_and_used_offers.lowest_offer
+
         return json_item
+
+    @property
+    def wishlist_offers(self):
+        return WishlistOffers(self)
 
 class WishlistOffers(BaseAmazon):
     """
@@ -417,7 +419,6 @@ class WishlistOffers(BaseAmazon):
     def __init__(self, wishlist_element):
 
         self.wishlist_element = wishlist_element
-        #print(self.wishlist_element.title)
 
         self.marketplaces_details = namedtuple('marketplaces_details', [
             'seller',
@@ -425,6 +426,22 @@ class WishlistOffers(BaseAmazon):
             'shipping',
             'condition'
         ])
+
+    def jsonable(self):
+        """Extend Wishlist().jsonable() with WishlistOffers and set title name as key in new dict.
+
+        :return: (dict) jsonable-dict in a dict with title as key.
+        """
+        res = {}
+
+        json_item = self.wishlist_element.jsonable()
+
+        # nauop stands for 'new and used offer price'
+        json_item["lowest_nauop"], json_item["lowser_nauop_incl_shipping"] = self.lowest_offer
+
+        res[json_item["title"]] = json_item
+
+        return res
 
     @staticmethod
     def get_price_from_string(price_as_string):
@@ -510,7 +527,7 @@ class WishlistOffers(BaseAmazon):
         lowest_offer = min(offers_details, key=lambda x: float(x.price))
         lowest_offer_incl_shipping = min(offers_details, key=lambda x: (float(x.price) + float(x.shipping)))
 
-        return lowest_offer, lowest_offer_incl_shipping
+        return lowest_offer._asdict(), lowest_offer_incl_shipping._asdict()
 
 
 class Wishlist(BaseAmazon):
