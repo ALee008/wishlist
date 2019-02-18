@@ -432,16 +432,16 @@ class WishlistOffers(BaseAmazon):
 
         :return: (dict) jsonable-dict in a dict with title as key.
         """
-        res = {}
+        #res = {}
 
         json_item = self.wishlist_element.jsonable()
 
         # nauop stands for 'new and used offer price'
-        json_item["lowest_nauop"], json_item["lowser_nauop_incl_shipping"] = self.lowest_offer
+        json_item["lowest_nauop"], json_item["lowest_nauop_incl_shipping"] = self.lowest_offer
 
-        res[json_item["title"]] = json_item
+        #res[json_item["title"]] = json_item
 
-        return res
+        return json_item
 
     @staticmethod
     def get_price_from_string(price_as_string):
@@ -522,6 +522,10 @@ class WishlistOffers(BaseAmazon):
     @property
     def lowest_offer(self):
         """
+        Calculate lowest offer price with and without regard of shipping costs. Cast namedtuple so result
+        will be jsonable. It happens, that _asdict() return an OrderedDict.
+
+        :return OrderedDict containing wishlist offer information.
         """
         offers_details = copy.deepcopy(self.offers_details)
         lowest_offer = min(offers_details, key=lambda x: float(x.price))
