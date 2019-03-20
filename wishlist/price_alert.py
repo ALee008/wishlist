@@ -1,4 +1,5 @@
 import json
+import notifiers
 
 class PriceAlert:
 
@@ -10,17 +11,18 @@ class PriceAlert:
         """
         self.old_item_price = old_item_call['price']
         self.new_item_price = latest_item_call['price']
-        self.relevative_price_difference = self.relative_price_difference(self.new_item_price, self.old_item_price)
+        self.relative_price_difference = self.get_relative_price_difference(self.new_item_price, self.old_item_price)
+
         # new and used offer price including shipping costs
         self.old_nauo_price = float(old_item_call['lowest_nauop_incl_shipping']['price'])
         self.new_nauo_price = float(latest_item_call['lowest_nauop_incl_shipping']['price'])
-        self.relevative_nauo_price_difference = self.relative_price_difference(self.new_nauo_price, self.old_nauo_price)
+        self.relative_nauo_price_difference = self.get_relative_price_difference(self.new_nauo_price, self.old_nauo_price)
 
     def prepare_wishlist_dict(self):
         pass
 
     @staticmethod
-    def relative_price_difference(new_price, old_price):
+    def get_relative_price_difference(new_price, old_price):
         """
         calculate relative price change between new and old price, considering sign.
         :param new_price: price from latest wishlist fetch.
@@ -50,7 +52,11 @@ class PriceAlert:
             return True
 
     def send_notification(self):
-        pass
+        gmail = notifiers.get_notifier("gmail")
+        print(type(gmail))
+        #gmail['subject'] = 'First test.'
+        #gmail['from'] = 'hsitty.hunter@googlemail.com'
+        #gmail.notify(to="nomansland008@googlemail.com", message="Hola")
 
     price_changed = property(compare_prices)
     nauo_price_changed = property(compare_nauo_prices)

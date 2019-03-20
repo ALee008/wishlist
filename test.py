@@ -69,7 +69,8 @@ key = "3ATVLKBO1V2CC"
 
 new_wishlist_items = [{'title': 'Sabrent USB Externe Soundkarte', 'price': 49.99, 'item_used_an_new_offers': '2', 'comment': '', 'added': 'Januar 26, 2019', 'rating': 4.3, 'digital': False, 'source': 'marketplace', 'lowest_nauop': OrderedDict([('seller', 'SLJ Trading'), ('price', '4.99'), ('shipping', '0.0'), ('condition', 'Neu')]), 'lowest_nauop_incl_shipping': OrderedDict([('seller', 'SLJ Trading'), ('price', '95.99'), ('shipping', '0.0'), ('condition', 'Neu')])},
        {'title': 'Neuftech USB RFID Reader ID Kartenlesegerät Kartenleser Kontaktlos Card Reader für EM4100', 'price': 11.49, 'item_used_an_new_offers': '4', 'comment': '', 'added': 'Januar 26, 2019', 'rating': 4.1, 'digital': False, 'source': 'marketplace', 'lowest_nauop': OrderedDict([('seller', 'Aznoi'), ('price', '11.49'), ('shipping', '0.0'), ('condition', 'Neu')]), 'lowest_nauop_incl_shipping': OrderedDict([('seller', 'Aznoi'), ('price', '11.49'), ('shipping', '0.0'), ('condition', 'Neu')])},
-       {'title': 'Simba 107203950 - Squap Fangballspiel 2-er Set, 2-Sortiert, Mehrfarbig', 'price': 13.99, 'item_used_an_new_offers': '27', 'comment': '', 'added': 'April 15, 2018', 'rating': 4.3, 'digital': False, 'source': 'marketplace', 'lowest_nauop': OrderedDict([('seller', 'Jumpstore Megastore Online'), ('price', '12.48'), ('shipping', '13.50'), ('condition', 'Neu')]), 'lowest_nauop_incl_shipping': OrderedDict([('seller', 'Amazon.de'), ('price', '13.99'), ('shipping', '0.0'), ('condition', 'Neu')])}]
+       {'title': 'Simba 107203950 - Squap Fangballspiel 2-er Set, 2-Sortiert, Mehrfarbig', 'price': 13.99, 'item_used_an_new_offers': '27', 'comment': '', 'added': 'April 15, 2018', 'rating': 4.3, 'digital': False, 'source': 'marketplace', 'lowest_nauop': OrderedDict([('seller', 'Jumpstore Megastore Online'), ('price', '12.48'), ('shipping', '13.50'), ('condition', 'Neu')]), 'lowest_nauop_incl_shipping': OrderedDict([('seller', 'Amazon.de'), ('price', '13.99'), ('shipping', '0.0'), ('condition', 'Neu')])},
+        {'title': 'NEW item Added', 'price': 13.99, 'item_used_an_new_offers': '27', 'comment': '', 'added': 'April 15, 2018', 'rating': 4.3, 'digital': False, 'source': 'marketplace', 'lowest_nauop': OrderedDict([('seller', 'Jumpstore Megastore Online'), ('price', '12.48'), ('shipping', '13.50'), ('condition', 'Neu')]), 'lowest_nauop_incl_shipping': OrderedDict([('seller', 'Amazon.de'), ('price', '13.99'), ('shipping', '0.0'), ('condition', 'Neu')])}]
 
 
 # com_data_structure:
@@ -117,17 +118,15 @@ for key in dict_keys:
         amazon_prices = alert.price_changed
         if amazon_prices:
             print("Amazon price for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%.".format(
-                key, alert.old_item_price, alert.new_item_price, alert.relevative_price_difference
+                key, alert.old_item_price, alert.new_item_price, alert.relative_price_difference
             )
                  )
 
         used_and_new_offer_prices = alert.nauo_price_changed
         if used_and_new_offer_prices:
             print("New and used price offer for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%.".format(
-                key, alert.old_nauo_price, alert.new_nauo_price, alert.relevative_nauo_price_difference
+                key, alert.old_nauo_price, alert.new_nauo_price, alert.relative_nauo_price_difference
             )
                  )
+        alert.send_notification()
 
-
-# TODO: what if item is added to wishlist
-# TODO: what if item is removed from wishlist
