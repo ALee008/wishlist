@@ -1,0 +1,24 @@
+[
+    {
+        "title": "A History Of God",
+        "price": 10.86,
+        "item_used_an_new_offers": "36",
+        "comment": "",
+        "added": "M\u00e4rz 17, 2019",
+        "rating": 3.5,
+        "digital": false,
+        "source": "marketplace",
+        "lowest_nauop": {
+            "seller": "Bear Books Germany",
+            "price": "0.98",
+            "shipping": "8.20",
+            "condition": "Gebraucht - Gut"
+        },
+        "lowest_nauop_incl_shipping": {
+            "seller": "UNIVERSALBOOKSLTD",
+            "price": "1.87",
+            "shipping": "3.00",
+            "condition": "Gebraucht - Gut"
+        }
+    }
+]

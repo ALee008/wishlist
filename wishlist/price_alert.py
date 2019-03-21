@@ -42,8 +42,10 @@ class PriceAlert:
         if abs(self.new_nauo_price - self.old_nauo_price) < 0.00001:
             return False
         else:
-            return "New and used price offer for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%."\
+            msg = "New and used price offer for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%."\
                 .format(self.item_name, self.old_nauo_price, self.new_nauo_price, self.relative_nauo_price_difference)
+            print(msg)
+            return msg
 
     def compare_prices(self):
         """
@@ -53,8 +55,10 @@ class PriceAlert:
         if abs(self.new_item_price - self.old_item_price) < 0.00001:
             return False
         else:
-            return "Amazon price for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%.".format(
+            msg = "Amazon price for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%.".format(
                 self.item_name, self.old_item_price, self.new_item_price, self.relative_price_difference)
+            print(msg)
+            return msg
 
     price_changed = property(compare_prices)
     nauo_price_changed = property(compare_nauo_prices)
