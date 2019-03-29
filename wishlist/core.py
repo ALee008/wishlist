@@ -37,7 +37,10 @@ class BaseAmazon(object):
             if os.name == 'nt':
                 locale.setlocale(locale.LC_ALL, 'deu_deu')
             else:
-                locale.setlocale(locale.LC_ALL, 'de_De')
+                try:
+                    locale.setlocale(locale.LC_ALL, 'de_De')  # mac os x uses locale de_De
+                except locale.Error:
+                    locale.setlocale(locale.LC_ALL, 'de_DE')  # raspbian uses locale de_DE
 
     def soupify(self, body):
         # https://www.crummy.com/software/BeautifulSoup/

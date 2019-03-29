@@ -2,14 +2,24 @@ import os
 import sys
 import time
 import argparse
+
+from loguru import logger
 import wishlist.price_alert as price_alert
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--push_api", help="Push bullet custom token. Used to send notifications.")
 parser.add_argument("-e", "--export_file", help="Json file path containing youngest wish list info.")
 parser.add_argument("-b", "--backup_file", help="Json file path containing the old wish list info.")
+parser.add_argument("-l", "--log_path", help="Logfile destination.")
 args = parser.parse_args()
 
+if not args.log_path:
+    log_path = r"./testdata/price_alert.log"
+else:
+    log_path = args.log_path
+
+logger.add(log_path, format="{time} {level} {message}",
+           level="DEBUG", mode="w")
 
 def get_wish_list_item(list_with_dict, key):
     """
@@ -31,10 +41,10 @@ i = 0
 while not os.path.exists(complete_file):
     i += 1
     if i > 60:
-        print(">>> No complete file found after {} iterations. Exit script with ret code 1.".format(i))
+        logger.info(">>> No complete file found after {} iterations. Exit script with ret code 1.".format(i))
         sys.exit(1)
     time.sleep(60)
-    print(">>> No complete file found since {} seconds. Sleep for another 60 seconds.".format(i * 60))
+    logger.info(">>> No complete file found since {} seconds. Sleep for another 60 seconds.".format(i * 60))
 
 # read latest wish list items
 new_wish_list_items = price_alert.read_json(args.export_file)
@@ -53,14 +63,16 @@ for wish_list_item in dict_keys_latest_wish_list:
     # if item in latest and old wish list check for price difference.
     if old_wish_list_item_data and new_wish_list_item_data:
         alert = price_alert.PriceAlert(new_wish_list_item_data, old_wish_list_item_data, wish_list_item)
-        amazon_prices = alert.price_changed
-        used_and_new_offer_prices = alert.nauo_price_changed
+        amazon_prices = alert.compare_prices(tolerance=10)
+        used_and_new_offer_prices = alert.compare_nauo_prices(tolerance=10)
         # send push bullet notification.
         if args.push_api:
             if amazon_prices:
                 resp1 = price_alert.push_message("Amazon Price Alert", amazon_prices, args.push_api)
+                logger.info(amazon_prices)
             if used_and_new_offer_prices:
                 resp2 = price_alert.push_message("New & Used Price Alert", used_and_new_offer_prices, args.push_api)
+                logger.info(used_and_new_offer_prices)
 
 os.remove(complete_file)
-print(">>> main_price_alert.py completed successfully.")
+logger.info(">>> main_price_alert.py completed successfully.")

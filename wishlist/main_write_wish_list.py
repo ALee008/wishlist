@@ -1,7 +1,11 @@
 import os
 import argparse
+from loguru import logger
 from wishlist.core import Wishlist
 import wishlist.price_alert as price_alert
+
+logger.add("/home/ali/bin/log/write_wish_list.log", format="{time} {level} {message}",
+           level="DEBUG", rotation="1 MB")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-k", "--key", help="Amazon wish list key (check wish list url)")

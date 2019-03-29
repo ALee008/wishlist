@@ -16,6 +16,7 @@ class PriceAlert:
         # new and used offer price including shipping costs
         self.old_nauo_price = float(old_item_call['lowest_nauop_incl_shipping']['price'])
         self.new_nauo_price = float(latest_item_call['lowest_nauop_incl_shipping']['price'])
+        self.nauo_shipping = float(latest_item_call['lowest_nauop_incl_shipping']['shipping'])
         self.relative_nauo_price_difference = self.get_relative_price_difference(self.new_nauo_price, self.old_nauo_price)
 
     def prepare_wishlist_dict(self):
@@ -34,34 +35,39 @@ class PriceAlert:
         except ZeroDivisionError:
             return 1.0 * 100
 
-    def compare_nauo_prices(self):
+    def compare_nauo_prices(self, tolerance=None):
         """
         Return True if nauo price from last fetch <> stored nauo price
         :return: (bool)
         """
         if abs(self.new_nauo_price - self.old_nauo_price) < 0.00001:
             return False
-        else:
-            msg = "New and used price offer for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%."\
-                .format(self.item_name, self.old_nauo_price, self.new_nauo_price, self.relative_nauo_price_difference)
+        # if tolerance is not provided send message otherwise use tolerance
+        if tolerance is None or self.relative_nauo_price_difference < (-1) * tolerance:
+            msg = "New and used price offer for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%. " \
+                  "Shipping costs {:.2f},-."\
+                .format(self.item_name, self.old_nauo_price, self.new_nauo_price, self.relative_nauo_price_difference
+                        , self.nauo_shipping)
             print(msg)
             return msg
+        else:
+            return False
 
-    def compare_prices(self):
+    def compare_prices(self, tolerance=None):
         """
         Return True if price from last fetch <> stored price
         :return: (bool)
         """
         if abs(self.new_item_price - self.old_item_price) < 0.00001:
             return False
-        else:
+        # if tolerance is not provided send message otherwise use tolerance
+        if tolerance is None or self.relative_price_difference < (-1) * tolerance:
             msg = "Amazon price for \"{}\" changed from {:.2f},- to {:.2f},-. Price difference {:.2f}%.".format(
                 self.item_name, self.old_item_price, self.new_item_price, self.relative_price_difference)
             print(msg)
             return msg
-
-    price_changed = property(compare_prices)
-    nauo_price_changed = property(compare_nauo_prices)
+        else:
+            return False
 
 
 def write_json(jsonable, json_file):

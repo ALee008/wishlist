@@ -3,4 +3,4 @@
 *.pyc
 .vagrant
 venv
-
+venv_mac
